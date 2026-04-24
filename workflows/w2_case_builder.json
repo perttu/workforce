@@ -1,0 +1,42 @@
+{
+  "name": "W2: Build Bookkeeping Case",
+  "nodes": [
+    {
+      "parameters": {
+        "context": "Extract bookkeeping requirements from this email. Identify: \n1. Period (e.g., 2026-03)\n2. Required Document (receipt, invoice)\n3. Vendor hints\n4. Specific amounts\nReturn ONLY JSON: { \"period\": \"string\", \"vendor_hints\": [], \"amount_hints\": [], \"urgency\": \"high\"|\"normal\" }",
+        "prompt": "={{ $json.body_text || $json.snippet }}"
+      },
+      "id": "w2-llm-extract",
+      "name": "AI Extraction",
+      "type": "n8n-nodes-base.googleGemini",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO bookkeeping_cases (source_email_id, request_type, accounting_period, extracted_json, status) VALUES ($1, $2, $3, $4, 'searching') RETURNING id;",
+        "queryParams": "={{ $node[\"Execute Workflow Trigger\"].json.id }}, {{ $json.document_type || 'missing_receipt' }}, {{ $json.period }}, {{ JSON.stringify($json) }}"
+      },
+      "id": "w2-db-insert",
+      "name": "Create Case",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "W3: Receipt Search"
+      },
+      "id": "w2-trigger-w3",
+      "name": "Trigger Search",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [600, 300]
+    }
+  ],
+  "connections": {
+    "AI Extraction": { "main": [[{ "node": "Create Case", "type": "main", "index": 0 }]] },
+    "Create Case": { "main": [[{ "node": "Trigger Search", "type": "main", "index": 0 }]] }
+  }
+}

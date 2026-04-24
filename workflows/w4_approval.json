@@ -1,0 +1,51 @@
+{
+  "name": "W4: Approval Loop",
+  "nodes": [
+    {
+      "parameters": {
+        "chatId": "={{ process.env.TELEGRAM_CHAT_ID }}",
+        "text": "=🧾 Bookkeeping Match Found!\n\nRequest: {{ $json.summary_text }}\nMatch: {{ $node[\"Fetch Best Candidate\"].json.rank_reason }}\nConfidence: {{ $node[\"Fetch Best Candidate\"].json.rank_score }}\n\nAction: Draft reply with this attachment?",
+        "replyMarkup": "inline_keyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "buttons": [
+                { "text": "✅ Approve", "additionalFields": { "callback_data": "=approve_{{ $json.id }}" } },
+                { "text": "❌ Reject", "additionalFields": { "callback_data": "=reject_{{ $json.id }}" } }
+              ]
+            }
+          ]
+        }
+      },
+      "id": "w4-telegram-notify",
+      "name": "Notify User",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "path": "approval-webhook",
+        "options": {}
+      },
+      "id": "w4-webhook",
+      "name": "Listen for Response",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 500]
+    },
+    {
+      "parameters": {
+        "workflowId": "W5: Execution"
+      },
+      "id": "w4-trigger-w5",
+      "name": "Trigger Execution",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [600, 500]
+    }
+  ],
+  "connections": {
+    "Listen for Response": { "main": [[{ "node": "Trigger Execution", "type": "main", "index": 0 }]] }
+  }
+}

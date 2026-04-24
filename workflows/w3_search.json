@@ -1,0 +1,55 @@
+{
+  "name": "W3: Receipt Search",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM emails WHERE has_attachments = true AND sent_at BETWEEN (SELECT created_at - INTERVAL '30 days' FROM bookkeeping_cases WHERE id = $1) AND (SELECT created_at + INTERVAL '5 days' FROM bookkeeping_cases WHERE id = $1);",
+        "queryParams": "={{ $node[\"Execute Workflow Trigger\"].json.id }}"
+      },
+      "id": "w3-db-fetch",
+      "name": "Fetch Candidates",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "context": "Compare this candidate email with the missing receipt request. Is it a match? \nReturn JSON: { \"confidence\": float, \"reason\": \"string\" }",
+        "prompt": "=Request: {{ $node[\"Execute Workflow Trigger\"].json.summary_text }}\nCandidate: {{ $json.subject }} - {{ $json.snippet }}"
+      },
+      "id": "w3-llm-rank",
+      "name": "AI Ranking",
+      "type": "n8n-nodes-base.googleGemini",
+      "typeVersion": 1,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO candidate_receipts (case_id, email_id, rank_score, rank_reason) VALUES ($1, $2, $3, $4);",
+        "queryParams": "={{ $node[\"Execute Workflow Trigger\"].json.id }}, {{ $json.id }}, {{ $node[\"AI Ranking\"].json.confidence }}, {{ $node[\"AI Ranking\"].json.reason }}"
+      },
+      "id": "w3-db-store",
+      "name": "Store Candidate",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [600, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "W4: Approval"
+      },
+      "id": "w3-trigger-w4",
+      "name": "Trigger Approval",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [800, 300]
+    }
+  ],
+  "connections": {
+    "Fetch Candidates": { "main": [[{ "node": "AI Ranking", "type": "main", "index": 0 }]] },
+    "AI Ranking": { "main": [[{ "node": "Store Candidate", "type": "main", "index": 0 }]] },
+    "Store Candidate": { "main": [[{ "node": "Trigger Approval", "type": "main", "index": 0 }]] }
+  }
+}

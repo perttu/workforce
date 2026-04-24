@@ -1,0 +1,35 @@
+{
+  "name": "W5: Execution",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "createDraft",
+        "messageId": "={{ $node[\"Fetch Case Details\"].json.source_provider_id }}",
+        "threadId": "={{ $node[\"Fetch Case Details\"].json.thread_id }}",
+        "emailType": "reply",
+        "text": "Hello, \n\nI have found the requested receipt for {{ $node[\"Fetch Case Details\"].json.period }}. Please find it attached.\n\nBest regards,\nAssistant",
+        "attachments": "={{ $node[\"Fetch Candidate Attachment\"].json.attachment_id }}"
+      },
+      "id": "w5-gmail-draft",
+      "name": "Create Gmail Draft",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE bookkeeping_cases SET status = 'done' WHERE id = $1;",
+        "queryParams": "={{ $json.case_id }}"
+      },
+      "id": "w5-db-update",
+      "name": "Mark Done",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [600, 300]
+    }
+  ],
+  "connections": {
+    "Create Gmail Draft": { "main": [[{ "node": "Mark Done", "type": "main", "index": 0 }]] }
+  }
+}

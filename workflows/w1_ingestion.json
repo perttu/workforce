@@ -1,0 +1,110 @@
+{
+  "name": "W1: Email Ingestion & Classification",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {
+          "q": "is:unread"
+        }
+      },
+      "id": "1f8e6c7e-8d5a-4b6e-9f3a-7c9b2d1e0f0a",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO emails (mailbox, provider_message_id, thread_id, from_address, subject, sent_at, body_text, snippet, attachment_count, has_attachments, labels_json, raw_metadata_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) ON CONFLICT (provider_message_id) DO NOTHING RETURNING id;",
+        "queryParams": "={{ $json.from.value[0].address }}, {{ $json.id }}, {{ $json.threadId }}, {{ $json.from.value[0].address }}, {{ $json.subject }}, {{ $json.date }}, {{ $json.textAsHtml }}, {{ $json.snippet }}, {{ $json.attachments ? $json.attachments.length : 0 }}, {{ !!$json.attachments }}, {{ JSON.stringify($json.labelIds) }}, {{ JSON.stringify($json) }}"
+      },
+      "id": "2f8e6c7e-8d5a-4b6e-9f3a-7c9b2d1e0f0b",
+      "name": "Save to DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.subject.toLowerCase().includes('kuitti') || $json.subject.toLowerCase().includes('receipt') || $json.subject.toLowerCase().includes('puuttuu') }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "3f8e6c7e-8d5a-4b6e-9f3a-7c9b2d1e0f0c",
+      "name": "Is Bookkeeping?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "W2: Build Bookkeeping Case"
+      },
+      "id": "4f8e6c7e-8d5a-4b6e-9f3a-7c9b2d1e0f0d",
+      "name": "Execute W2",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        700,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Save to DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to DB": {
+      "main": [
+        [
+          {
+            "node": "Is Bookkeeping?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Bookkeeping?": {
+      "main": [
+        [
+          {
+            "node": "Execute W2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
